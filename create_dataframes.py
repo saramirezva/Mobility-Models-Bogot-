@@ -13,6 +13,7 @@ import pandas as pd
 import geopandas as gpd
 from shapely.geometry import LineString
 from pyproj import Geod
+import winsound
 
 # Declaring the paths of the trips data
 trips_path = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/ViajesEODH2019.csv'
@@ -37,6 +38,33 @@ trips_df = trips_df[(trips_df['mun_destino'] == 11001) | (trips_df['mun_destino'
 houses_df = houses_df[(houses_df['municipio'] == 11001) | (houses_df['municipio'] == 25754)]
 # Filtering the data to avoid the ZAT number 0.0
 trips_df = trips_df[(trips_df['zat_origen']>0)&(trips_df['zat_destino']>0)]
+
+# Measuring the distance between two ZATs
+def zats_distance(or_zat, dest_zat):
+    geod = Geod(ellps = 'WGS84')
+    org_point = zats_map[zats_map['ZAT']==or_zat]['center'].iloc[0]
+    dest_point = zats_map[zats_map['ZAT']==dest_zat]['center'].iloc[0]
+    line = LineString([org_point, dest_point])
+    dist = geod.geometry_length(line)
+    return dist
+# Measuring the distance between each ZAT 
+zats_array = np.array(zats_map['ZAT'])
+distances_array = []
+zat_i = []
+zat_j =[]
+def dist_zats():
+    for i in range(1, len(zats_array)):
+        #print(i)
+        for j in range(i+1, len(zats_array)):
+            zat_i.append(zats_array[i])
+            zat_j.append(zats_array[j])
+            d = zats_distance(zats_array[i], zats_array[j])
+            distances_array.append(d)
+    return distances_array
+distances_array = dist_zats()
+# Making a dataframe with all the distances between zats
+dict = {'zat i': zat_i, 'zat j': zat_j, 'Distances': distances_array}
+dist_df = pd.DataFrame(dict).sort_values(by='Distances')
 
 # Defining that creates the directed dataframe i.e. T_ij != T_ji
 
@@ -94,10 +122,38 @@ def directed_dataframe():
 
     num_dis_trips['distance'] = distance
     num_dis_trips = num_dis_trips[['zat_origen', 'zat_destino', 'Origin Trips', 'Destination Trips', 'Org Nodal Strength', 'Dest Nodal Strength', 'distance','Trips']]
+
+    # Computing s_ij for each trip registered 
+    s_ij = []
+    for i in range(len(num_dis_trips)):
+        orgn = num_dis_trips.iloc[i]['zat_origen']
+        dest = num_dis_trips.iloc[i]['zat_destino']
+        #print(orgn, dest)
+        my_dist = zats_distance(orgn, dest)
+        my_array = dist_df[(dist_df['zat i']==orgn)|(dist_df['zat j']==orgn)]
+        my_array = my_array[my_array['Distances']<my_dist]
+        my_zones = list(my_array[my_array['zat i']==orgn]['zat j'])+list(my_array[my_array['zat j']==orgn]['zat i'])
+        s = 0
+        for j in my_zones:
+            try:
+                s = total_trips[total_trips['ZAT']==j]['trips'].iloc[0]+s
+            except:
+                continue
+        s_ij.append(s)
+    # Adding the s_ij quantity to the dataframe 
+    num_dis_trips.loc[:, 's_ij'] = s_ij
     
     return num_dis_trips
 
 # Creating the directed dataframe
 num_dis_trips = directed_dataframe()
 
+# Saving the dataframe
+df_path = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/num_dis_trips.csv'
+num_dis_trips.to_csv(df_path)
 print(num_dis_trips)
+
+# Make a sound when the code ends
+time = 1000  # milliseconds
+freq = 440  # Hz
+winsound.Beep(freq, time)
