@@ -5,7 +5,7 @@ Created on Thu Jun 04 2024
 
 """
 
-# This code creates the needed dataframes in order to fit the data with the better model
+# This code creates the needed dataframes in order to fit the data with the better model using only a edge list
 
 # Calling the libreries
 import numpy as np
@@ -38,6 +38,10 @@ trips_df = trips_df[(trips_df['mun_destino'] == 11001) | (trips_df['mun_destino'
 houses_df = houses_df[(houses_df['municipio'] == 11001) | (houses_df['municipio'] == 25754)]
 # Filtering the data to avoid the ZAT number 0.0
 trips_df = trips_df[(trips_df['zat_origen']>0)&(trips_df['zat_destino']>0)]
+# Adding the socio-economic stratification of the person that relises a trip
+trips_df = (trips_df.merge(houses_df[['Id_Hogar', 'p5_estrato']], left_on='id_hogar', right_on='Id_Hogar')
+            .rename(columns={'p5_estrato': 'stratification'})
+            .drop(columns='Id_Hogar'))
 
 # Measuring the distance between two ZATs
 def zats_distance(or_zat, dest_zat):
@@ -66,12 +70,10 @@ distances_array = dist_zats()
 dict = {'zat i': zat_i, 'zat j': zat_j, 'Distances': distances_array}
 dist_df = pd.DataFrame(dict).sort_values(by='Distances')
 
-# Defining that creates the directed dataframe i.e. T_ij != T_ji
-
-def directed_dataframe():
+# Defining the function that creates the directed dataframe i.e. T_ij != T_ji
+# The function needs only an edge list
+def directed_dataframe(num_trips_df):
     # Computing the number of trips between diferent zats 
-    num_trips_df = trips_df[['zat_origen', 'zat_destino']]
-    #num_trips_df['trips'] = np.ones(len(num_trips_df)) 
     num_trips_df.loc[0:, ['trips']] = 1
     num_trips_df = (num_trips_df.groupby(['zat_origen', 'zat_destino'], as_index=False)['trips']
                                 .agg('sum')
@@ -145,15 +147,45 @@ def directed_dataframe():
     
     return num_dis_trips
 
-# Creating the directed dataframe
-num_dis_trips = directed_dataframe()
+# Creating the edge list of the diferent networks
+# Edge list of all the network
+all_network = trips_df[['zat_origen', 'zat_destino']]
+# Edge list of the network separated by stratification
+net_1 = trips_df[trips_df['stratification']==1][['zat_origen', 'zat_destino']]
+net_2 = trips_df[trips_df['stratification']==2][['zat_origen', 'zat_destino']]
+net_3 = trips_df[trips_df['stratification']==3][['zat_origen', 'zat_destino']]
+net_4 = trips_df[trips_df['stratification']==4][['zat_origen', 'zat_destino']]
+net_5 = trips_df[trips_df['stratification']==5][['zat_origen', 'zat_destino']]
+net_6 = trips_df[trips_df['stratification']==6][['zat_origen', 'zat_destino']]
 
-# Saving the dataframe
+# Creating the directed dataframe of all the network
+# num_dis_trips = directed_dataframe(all_network)
+# Creating the dataframes for all the stratas
+num_trips_1 = directed_dataframe(net_1)
+num_trips_2 = directed_dataframe(net_2)
+num_trips_3 = directed_dataframe(net_3)
+num_trips_4 = directed_dataframe(net_4)
+num_trips_5 = directed_dataframe(net_5)
+num_trips_6 = directed_dataframe(net_6)
+
+# Saving the dataframes
 df_path = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/num_dis_trips.csv'
-num_dis_trips.to_csv(df_path)
-print(num_dis_trips)
+path_1 = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/estrato_1.csv'
+path_2 = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/estrato_2.csv'
+path_3 = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/estrato_3.csv'
+path_4 = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/estrato_4.csv'
+path_5 = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/estrato_5.csv'
+path_6 = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/estrato_6.csv'
+
+# num_dis_trips.to_csv(df_path)
+num_trips_1.to_csv(path_1)
+num_trips_2.to_csv(path_2)
+num_trips_3.to_csv(path_3)
+num_trips_4.to_csv(path_4)
+num_trips_5.to_csv(path_5)
+num_trips_6.to_csv(path_6)
 
 # Make a sound when the code ends
-time = 1000  # milliseconds
-freq = 440  # Hz
-winsound.Beep(freq, time)
+# time = 1000  # milliseconds
+# freq = 440  # Hz
+# winsound.Beep(freq, time)
