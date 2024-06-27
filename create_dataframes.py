@@ -13,12 +13,15 @@ import pandas as pd
 import geopandas as gpd
 from shapely.geometry import LineString
 from pyproj import Geod
+from datetime import datetime, timedelta, time
 import winsound
 
 # Declaring the paths of the trips data
 trips_path = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/ViajesEODH2019.csv'
 # Path of the population data
 houses_path = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/HogaresEODH2019.csv'
+# Path to the duration data
+dur_path = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/Aux_DuracionEODH2019.csv'
 # Path of the ZATs shapefiles
 shape_path = r'./Encuesta de Movilidad 2019/Zonificacion_(shapefiles)/ZONAS/ZONAS/ZAT.shp'
 # Path of the streets shapefile
@@ -27,6 +30,8 @@ streets_path = r'./Encuesta de Movilidad 2019/Zonificacion_(shapefiles)/Malla_Vi
 trips_df = pd.read_csv(trips_path, sep = ';')
 # Converting the population data to dataframe
 houses_df = pd.read_csv(houses_path, sep= ';', low_memory=False)
+# Converting the duration data to dataframe
+duration_df = pd.read_csv(dur_path, sep = ';')
 # Calling the ZAT's shapefile
 zats_map = gpd.read_file(shape_path)
 # Computing the centroid of each zat
@@ -42,6 +47,14 @@ trips_df = trips_df[(trips_df['zat_origen']>0)&(trips_df['zat_destino']>0)]
 trips_df = (trips_df.merge(houses_df[['Id_Hogar', 'p5_estrato']], left_on='id_hogar', right_on='Id_Hogar')
             .rename(columns={'p5_estrato': 'stratification'})
             .drop(columns='Id_Hogar'))
+# Adding the information about the duration and the time of each trip
+columns = ['id_hogar', 'id_persona', 'id_viaje']
+dur_columns = ['id_hogar', 'id_persona', 'id_viaje', 'hora_inicio_viaje', 'p31_hora_llegada', 'duracion']
+trips_df = (trips_df.merge(duration_df[dur_columns], left_on=columns, right_on=columns)
+                    .rename(columns={'hora_inicio_viaje_y': 'hora_inicio', 'p31_hora_llegada_y': 'hora_llegada'})
+                    .drop(columns=['hora_inicio_viaje_x', 'p31_hora_llegada_x']))
+trips_df['hora_inicio'] = pd.to_datetime(trips_df['hora_inicio'], format='%H:%M').dt.time
+trips_df['hora_llegada'] = pd.to_datetime(trips_df['hora_llegada'], format='%H:%M').dt.time
 
 # Measuring the distance between two ZATs
 def zats_distance(or_zat, dest_zat):
@@ -148,18 +161,31 @@ def directed_dataframe(num_trips_df):
     return num_dis_trips
 
 # Creating the edge list of the diferent networks
+edges = ['zat_origen', 'zat_destino']
+
 # Edge list of all the network
-all_network = trips_df[['zat_origen', 'zat_destino']]
+all_network = trips_df[edges]
+
 # Edge list of the network separated by stratification
-net_1 = trips_df[trips_df['stratification']==1][['zat_origen', 'zat_destino']]
-net_2 = trips_df[trips_df['stratification']==2][['zat_origen', 'zat_destino']]
-net_3 = trips_df[trips_df['stratification']==3][['zat_origen', 'zat_destino']]
-net_4 = trips_df[trips_df['stratification']==4][['zat_origen', 'zat_destino']]
-net_5 = trips_df[trips_df['stratification']==5][['zat_origen', 'zat_destino']]
-net_6 = trips_df[trips_df['stratification']==6][['zat_origen', 'zat_destino']]
+net_1 = trips_df[trips_df['stratification']==1][edges]
+net_2 = trips_df[trips_df['stratification']==2][edges]
+net_3 = trips_df[trips_df['stratification']==3][edges]
+net_4 = trips_df[trips_df['stratification']==4][edges]
+net_5 = trips_df[trips_df['stratification']==5][edges]
+net_6 = trips_df[trips_df['stratification']==6][edges]
+
+# Edge list of the network separated by three windows of hours, morning(4:00-10:00), afternoon(10:00-16:00) and night(16:00, 22:00)
+first = datetime.strptime('04:00', '%H:%M').time()
+second = datetime.strptime('10:00', '%H:%M').time()
+third = datetime.strptime('16:00', '%H:%M').time()
+fourth = datetime.strptime('22:00', '%H:%M').time()
+net_morning = trips_df[(trips_df['hora_inicio']>first) & (trips_df['hora_inicio']<second)][edges]
+net_afternoon = trips_df[(trips_df['hora_inicio']>second) & (trips_df['hora_inicio']<third)][edges]
+net_night = trips_df[(trips_df['hora_inicio']>third) & (trips_df['hora_inicio']<fourth)][edges]
 
 # Creating the directed dataframe of all the network
 # num_dis_trips = directed_dataframe(all_network)
+
 # Creating the dataframes for all the stratas
 num_trips_1 = directed_dataframe(net_1)
 num_trips_2 = directed_dataframe(net_2)
@@ -167,6 +193,11 @@ num_trips_3 = directed_dataframe(net_3)
 num_trips_4 = directed_dataframe(net_4)
 num_trips_5 = directed_dataframe(net_5)
 num_trips_6 = directed_dataframe(net_6)
+
+# Creating the dataframes in function of the hour
+num_trips_morning = directed_dataframe(net_morning)
+num_trips_aftnoon = directed_dataframe(net_afternoon)
+num_trips__night = directed_dataframe(net_night)
 
 # Saving the dataframes
 df_path = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/num_dis_trips.csv'
@@ -176,6 +207,9 @@ path_3 = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/estrato_3.csv'
 path_4 = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/estrato_4.csv'
 path_5 = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/estrato_5.csv'
 path_6 = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/estrato_6.csv'
+path_morning = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/morning.csv'
+path_aftnoon = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/afternoon.csv'
+path_night = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/night.csv'
 
 # num_dis_trips.to_csv(df_path)
 num_trips_1.to_csv(path_1)
@@ -184,6 +218,9 @@ num_trips_3.to_csv(path_3)
 num_trips_4.to_csv(path_4)
 num_trips_5.to_csv(path_5)
 num_trips_6.to_csv(path_6)
+num_trips_morning.to_csv(path_morning)
+num_trips_aftnoon.to_csv(path_aftnoon)
+num_trips__night.to_csv(path_night)
 
 # Make a sound when the code ends
 # time = 1000  # milliseconds
