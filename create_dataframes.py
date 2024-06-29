@@ -15,6 +15,7 @@ from shapely.geometry import LineString
 from pyproj import Geod
 from datetime import datetime, timedelta, time
 import winsound
+import os
 
 # Declaring the paths of the trips data
 trips_path = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/ViajesEODH2019.csv'
@@ -226,3 +227,6 @@ num_trips__night.to_csv(path_night)
 # time = 1000  # milliseconds
 # freq = 440  # Hz
 # winsound.Beep(freq, time)
+
+# Shutdown the computer when the code ends to run
+# os.system("shutdown /s /t 1")
