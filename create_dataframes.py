@@ -25,8 +25,6 @@ houses_path = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/HogaresEODH2019.c
 dur_path = r'./Encuesta de Movilidad 2019/EODH/Archivos_CSV/Aux_DuracionEODH2019.csv'
 # Path of the ZATs shapefiles
 shape_path = r'./Encuesta de Movilidad 2019/Zonificacion_(shapefiles)/ZONAS/ZONAS/ZAT.shp'
-# Path of the streets shapefile
-streets_path = r'./Encuesta de Movilidad 2019/Zonificacion_(shapefiles)/Malla_Vial_Integral_Bogota_D_C/Malla_Vial_Integral_Bogota_D_C.shp'
 # Converting the CSV in a pandas dataframe
 trips_df = pd.read_csv(trips_path, sep = ';')
 # Converting the population data to dataframe
